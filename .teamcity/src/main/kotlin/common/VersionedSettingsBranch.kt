@@ -1,6 +1,15 @@
 package common
 
-import jetbrains.buildServer.configs.kotlin.v2019_2.DslContext
+import jetbrains.buildServer.configs.kotlin.DslContext
+
+fun isSecurityFork(): Boolean {
+    return DslContext.settingsRoot.id.toString().lowercase().contains("security")
+}
+
+// GradleMaster -> Master
+// GradleSecurityAdvisory84mwRelease -> SecurityAdvisory84mwRelease
+val DslContext.uuidPrefix: String
+    get() = settingsRoot.id.toString().substringAfter("Gradle")
 
 data class VersionedSettingsBranch(val branchName: String) {
     /**
@@ -38,16 +47,8 @@ data class VersionedSettingsBranch(val branchName: String) {
         private
         val OLD_RELEASE_PATTERN = "release(\\d+)x".toRegex()
 
-        private
-        val mainBranches = setOf(MASTER_BRANCH, RELEASE_BRANCH)
-
         fun fromDslContext(): VersionedSettingsBranch {
-            val branch = DslContext.getParameter("Branch")
-            // TeamCity uses a dummy name when first running the DSL
-            if (branch.contains("placeholder-1")) {
-                return VersionedSettingsBranch(MASTER_BRANCH)
-            }
-            return VersionedSettingsBranch(branch)
+            return VersionedSettingsBranch(DslContext.getParameter("Branch", "placeholder"))
         }
 
         private fun determineNightlyPromotionTriggerHour(branchName: String) = when (branchName) {
@@ -75,7 +76,7 @@ data class VersionedSettingsBranch(val branchName: String) {
     val isExperimental: Boolean
         get() = branchName == EXPERIMENTAL_BRANCH
 
-    fun vcsRootId() = "Gradle${branchName.toCapitalized()}"
+    fun vcsRootId() = DslContext.settingsRoot.id.toString()
 
     fun promoteNightlyTaskName() = nightlyTaskName("promote")
     fun prepNightlyTaskName() = nightlyTaskName("prep")

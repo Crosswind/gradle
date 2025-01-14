@@ -16,10 +16,10 @@
 
 package common
 
-import jetbrains.buildServer.configs.kotlin.v2019_2.BuildStep
-import jetbrains.buildServer.configs.kotlin.v2019_2.BuildSteps
-import jetbrains.buildServer.configs.kotlin.v2019_2.BuildType
-import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.script
+import jetbrains.buildServer.configs.kotlin.BuildStep
+import jetbrains.buildServer.configs.kotlin.BuildSteps
+import jetbrains.buildServer.configs.kotlin.BuildType
+import jetbrains.buildServer.configs.kotlin.buildSteps.script
 
 fun BuildType.applyPerformanceTestSettings(os: Os = Os.LINUX, arch: Arch = Arch.AMD64, timeout: Int = 30) {
     applyDefaultSettings(os = os, arch = arch, timeout = timeout)
@@ -44,6 +44,7 @@ fun performanceTestCommandLine(
     baselines: String,
     extraParameters: String = "",
     os: Os = Os.LINUX,
+    arch: Arch = Arch.AMD64,
     testJavaVersion: String = os.perfTestJavaVersion.major.toString(),
     testJavaVendor: String = os.perfTestJavaVendor.toString(),
 ) = listOf(
@@ -54,7 +55,7 @@ fun performanceTestCommandLine(
     "-PautoDownloadAndroidStudio=true",
     "-PrunAndroidStudioInHeadlessMode=true",
     "-Porg.gradle.java.installations.auto-download=false",
-    os.javaInstallationLocations()
+    os.javaInstallationLocations(arch)
 ) + listOf(
     "-Porg.gradle.performance.branchName" to "%teamcity.build.branch%",
     "-Porg.gradle.performance.db.url" to "%performance.db.url%",
@@ -62,20 +63,11 @@ fun performanceTestCommandLine(
 ).map { (key, value) -> os.escapeKeyValuePair(key, value) }
 
 const val individualPerformanceTestArtifactRules = """
-subprojects/*/build/test-results-*.zip => results
-subprojects/*/build/tmp/**/log.txt => failure-logs
-subprojects/*/build/tmp/**/profile.log => failure-logs
-subprojects/*/build/tmp/**/daemon-*.out.log => failure-logs
+testing/*/build/test-results-*.zip => results
+testing/*/build/tmp/**/log.txt => failure-logs
+testing/*/build/tmp/**/profile.log => failure-logs
+testing/*/build/tmp/**/daemon-*.out.log => failure-logs
 """
-
-fun BuildSteps.killGradleProcessesStep(os: Os) {
-    script {
-        name = "KILL_GRADLE_PROCESSES"
-        executionMode = BuildStep.ExecutionMode.ALWAYS
-        scriptContent = os.killAllGradleProcesses
-        skipConditionally()
-    }
-}
 
 // to avoid pathname too long error
 fun BuildSteps.substDirOnWindows(os: Os) {
@@ -88,6 +80,18 @@ fun BuildSteps.substDirOnWindows(os: Os) {
                 subst p: "%teamcity.build.checkoutDir%"
             """.trimIndent()
             skipConditionally()
+        }
+    }
+}
+
+fun BuildType.cleanUpGitUntrackedFilesAndDirectories() {
+    steps {
+        script {
+            name = "CLEAN_UP_GIT_UNTRACKED_FILES_AND_DIRECTORIES"
+            executionMode = BuildStep.ExecutionMode.RUN_ONLY_ON_FAILURE
+            scriptContent = "git clean -fdx -e test-splits/ -e .gradle/workspace-id.txt -e \"*.psoutput\""
+            skipConditionally()
+            onlyRunOnGitHubMergeQueueBranch()
         }
     }
 }

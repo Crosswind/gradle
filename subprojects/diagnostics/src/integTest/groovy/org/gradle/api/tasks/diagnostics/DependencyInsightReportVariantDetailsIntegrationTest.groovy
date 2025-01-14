@@ -146,7 +146,7 @@ ${variantOf('apiElements', [
                 'org.gradle.libraryelements': of('jar', 'classes'),
                 'org.gradle.usage': of('java-api', 'java-api'),
                 'org.gradle.jvm.environment': of('', 'standard-jvm')
-])}
+            ])}
 
 ---------------------
 Unselected Variant(s)
@@ -201,8 +201,6 @@ ${variantOf('runtimeElements-resources', [
 
 ${variantOf('testResultsElementsForTest', [
                 'org.gradle.testsuite.name': of('test', ''),
-                'org.gradle.testsuite.target.name': of('test', ''),
-                'org.gradle.testsuite.type': of('unit-test', ''),
                 'org.gradle.verificationtype': of('test-results', ''),
                 'org.gradle.category': of('verification', 'library'),
                 'org.gradle.dependency.bundling': of('', 'external'),
@@ -247,7 +245,7 @@ project :$expectedProject
 
         then:
         ['b', 'c'].each { expectedProject ->
-            result.groupedOutput.task(":a:insight").assertOutputContains"""project :$expectedProject
+            result.groupedOutput.task(":a:insight").assertOutputContains """project :$expectedProject
 -------------------
 Selected Variant(s)
 -------------------
@@ -314,8 +312,6 @@ ${variantOf('runtimeElements-resources', [
 
 ${variantOf('testResultsElementsForTest', [
                 'org.gradle.testsuite.name': of('test', ''),
-                'org.gradle.testsuite.target.name': of('test', ''),
-                'org.gradle.testsuite.type': of('unit-test', ''),
                 'org.gradle.verificationtype': of('test-results', ''),
                 'org.gradle.category': of('verification', 'library'),
                 'org.gradle.dependency.bundling': of('', 'external'),
@@ -374,7 +370,7 @@ project :$expectedProject
             apply plugin: 'java-library'
 
             repositories {
-               maven { url "${mavenRepo.uri}" }
+               maven { url = "${mavenRepo.uri}" }
             }
 
             dependencies {
@@ -414,7 +410,7 @@ org.test:leaf:1.0
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -447,7 +443,7 @@ org:middle:1.0 FAILED
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -489,7 +485,7 @@ org:leaf:1.0
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 conf {
@@ -538,7 +534,7 @@ org:leaf:1.0
             def dependencyValue = objects.named(CustomAttributeType.class, 'dep_value')
 
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 conf {

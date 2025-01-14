@@ -24,6 +24,7 @@ class DependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
 
     def "omits repeated dependencies in case of circular dependencies"() {
         given:
+        createDirs("client", "a", "b", "c")
         file("settings.gradle") << "include 'client', 'a', 'b', 'c'"
 
         buildFile << """
@@ -33,6 +34,8 @@ allprojects {
     group = "group"
     version = 1.0
 }
+
+dependencies { compile project(":c") }
 
 project(":a") {
     dependencies { compile project(":b") }
@@ -49,21 +52,23 @@ project(":c") {
 """
 
         when:
-        run ":c:dependencies"
+        run ":dependencies"
 
         then:
         output.contains """
 compile
-\\--- project :a
-     +--- project :b
-     |    \\--- project :c (*)
-     \\--- project :c (*)
+\\--- project :c
+     \\--- project :a
+          +--- project :b
+          |    \\--- project :c (*)
+          \\--- project :c (*)
 """
         output.contains '(*) - Indicates repeated occurrences of a transitive dependency subtree. Gradle expands transitive dependency subtrees only once per project; repeat occurrences only display the root of the subtree, followed by this annotation.'
     }
 
     def "marks project dependency that can't be resolved as 'FAILED'"() {
         given:
+        createDirs("A", "B", "C")
         settingsFile << "include 'A', 'B', 'C'"
 
         // Fail due to missing target configurations
@@ -100,7 +105,7 @@ conf
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { foo }
             dependencies {
@@ -127,7 +132,7 @@ foo
         given:
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { foo }
             dependencies {
@@ -163,7 +168,7 @@ foo
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { config }
             dependencies {
@@ -193,7 +198,7 @@ config
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations {
               config {
@@ -228,7 +233,7 @@ config
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { foo }
             dependencies {
@@ -260,6 +265,7 @@ config
 
         mavenRepo.module("foo", "baz", "5.0").publish()
 
+        createDirs("a", "b", "c", "d", "e")
         file("settings.gradle") << """include 'a', 'b', 'c', 'd', 'e'
 rootProject.name = 'root'
 """
@@ -269,7 +275,7 @@ rootProject.name = 'root'
                 apply plugin: 'java-library'
                 version = '1.0'
                 repositories {
-                    maven { url "${mavenRepo.uri}" }
+                    maven { url = "${mavenRepo.uri}" }
                 }
             }
 
@@ -342,7 +348,7 @@ compileClasspath - Compile classpath for source set 'main'.
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
 
             configurations {
@@ -380,7 +386,7 @@ conf
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 conf
@@ -411,7 +417,7 @@ A web-based, searchable dependency report is available by adding the --scan opti
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
 
             configurations {
@@ -450,7 +456,7 @@ conf
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
 
             configurations {
@@ -488,7 +494,7 @@ conf
 
         file("build.gradle") << """
             repositories {
-                ivy { url "${ivyRepo.uri}" }
+                ivy { url = "${ivyRepo.uri}" }
             }
             configurations {
                 conf
@@ -525,7 +531,7 @@ conf
 
         file("build.gradle") << """
             repositories {
-                ivy { url "${ivyRepo.uri}" }
+                ivy { url = "${ivyRepo.uri}" }
             }
 
             configurations {
@@ -577,6 +583,7 @@ No dependencies
 
     def "dependencies report does not run for subprojects by default"() {
         given:
+        createDirs("a")
         file("settings.gradle") << "include 'a'"
 
         file("build.gradle") << """
@@ -607,7 +614,7 @@ No dependencies
 
         file("build.gradle") << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
 
             configurations {
@@ -640,7 +647,7 @@ conf2
 
         buildFile << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
 
             configurations { conf }
@@ -671,6 +678,7 @@ conf
         mavenRepo.module("foo", "bar", "1.0").publish()
         mavenRepo.module("foo", "bar", "2.0").publish()
 
+        createDirs("a", "b", "a/c", "d", "e")
         file("settings.gradle") << """include 'a', 'b', 'a:c', 'd', 'e'
 rootProject.name = 'root'
 """
@@ -680,7 +688,7 @@ rootProject.name = 'root'
                 apply plugin: 'java-library'
                 version = '1.0'
                 repositories {
-                    maven { url "${mavenRepo.uri}" }
+                    maven { url = "${mavenRepo.uri}" }
                 }
             }
 
@@ -740,20 +748,21 @@ compileClasspath - Compile classpath for source set 'main'.
     def "reports external dependency replaced with project dependency"() {
         mavenRepo.module("org.utils", "api",  '1.3').publish()
 
+        createDirs("client", "api2", "impl")
         file("settings.gradle") << "include 'client', 'api2', 'impl'"
 
         buildFile << """
             allprojects {
                 version = '1.0'
                 repositories {
-                    maven { url "${mavenRepo.uri}" }
+                    maven { url = "${mavenRepo.uri}" }
                 }
 
                 configurations {
                     compile
                 }
 
-                group "org.somethingelse"
+                group = "org.somethingelse"
             }
 
             project(":api2") {
@@ -784,20 +793,21 @@ compile
     def "reports external dependency with version updated by resolve rule"() {
         mavenRepo.module("org.utils", "api", '0.1').publish()
 
+        createDirs("client", "impl")
         file("settings.gradle") << "include 'client', 'impl'"
 
         buildFile << """
             allprojects {
                 version = '1.0'
                 repositories {
-                    maven { url "${mavenRepo.uri}" }
+                    maven { url = "${mavenRepo.uri}" }
                 }
 
                 configurations {
                     compile
                 }
 
-                group "org.utils"
+                group = "org.utils"
             }
 
             project(":impl") {
@@ -827,20 +837,21 @@ compile
         mavenRepo.module("org.utils", "api", '0.1').publish()
         mavenRepo.module("org.other", "another", '0.1').publish()
 
+        createDirs("client", "impl")
         file("settings.gradle") << "include 'client', 'impl'"
 
         buildFile << """
             allprojects {
                 version = '1.0'
                 repositories {
-                    maven { url "${mavenRepo.uri}" }
+                    maven { url = "${mavenRepo.uri}" }
                 }
 
                 configurations {
                     compile
                 }
 
-                group "org.utils"
+                group = "org.utils"
             }
 
             project(":impl") {
@@ -873,7 +884,7 @@ compile
 
         file("build.gradle") << """
             repositories {
-               maven { url "${mavenRepo.uri}" }
+               maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 api.canBeConsumed = false
@@ -920,7 +931,7 @@ api (n)
 
         buildFile << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { conf }
             dependencies {
@@ -954,7 +965,7 @@ conf
 
         buildFile << """
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { conf }
             dependencies {
@@ -998,15 +1009,15 @@ conf
         def moduleB = mavenRepo.module('group', 'moduleB', '1.0').dependsOn(moduleC).publish()
         def moduleA = mavenRepo.module('group', 'moduleA', '2.0').dependsOn(moduleB).publish()
         mavenRepo.module('group', 'bom', '1.0')
-                .hasType("pom")
-                .dependencyConstraint(moduleA)
-                .dependencyConstraint(moduleC)
-                .publish()
+            .hasType("pom")
+            .dependencyConstraint(moduleA)
+            .dependencyConstraint(moduleC)
+            .publish()
 
         buildFile << """
             apply plugin: 'java' // Java plugin required for BOM import
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             dependencies {
                 implementation platform('group:bom:1.0')
@@ -1032,12 +1043,13 @@ compileClasspath - Compile classpath for source set 'main'.
 
     def "adding declarations to deprecated configurations for declaration will warn"() {
         given:
+        createDirs("a", "b")
         file("settings.gradle") << "include 'a', 'b'"
 
         buildFile << """
             subprojects {
                 configurations {
-                    createWithRole('compile', org.gradle.api.internal.artifacts.configurations.ConfigurationRolesForMigration.RESOLVABLE_BUCKET_TO_RESOLVABLE)
+                    migratingUnlocked('compile', org.gradle.api.internal.artifacts.configurations.ConfigurationRolesForMigration.RESOLVABLE_DEPENDENCY_SCOPE_TO_RESOLVABLE)
                     'default' { extendsFrom compile }
                 }
                 group = "group"
@@ -1048,7 +1060,7 @@ compileClasspath - Compile classpath for source set 'main'.
             }
         """
 
-        executer.expectDocumentedDeprecationWarning("The compile configuration has been deprecated for dependency declaration. This will fail with an error in Gradle 9.0. Please use another configuration instead. Consult the upgrading guide for further information: https://docs.gradle.org/current/userguide/upgrading_version_5.html#dependencies_should_no_longer_be_declared_using_the_compile_and_runtime_configurations")
+        executer.expectDocumentedDeprecationWarning("The compile configuration has been deprecated for dependency declaration. This will fail with an error in Gradle 9.0. Please use another configuration instead. For more information, please refer to https://docs.gradle.org/current/userguide/declaring_dependencies.html#sec:deprecated-configurations in the Gradle documentation.")
 
         expect:
         succeeds ':a:dependencies'
@@ -1056,12 +1068,13 @@ compileClasspath - Compile classpath for source set 'main'.
 
     def "adding declarations to invalid configurations for declaration will fail"() {
         given:
+        createDirs("a", "b")
         file("settings.gradle") << "include 'a', 'b'"
 
         buildFile << """
             subprojects {
                 configurations {
-                    compile.canBeDeclaredAgainst = false
+                    compile.canBeDeclared = false
                     'default' { extendsFrom compile }
                 }
                 group = "group"
@@ -1083,39 +1096,41 @@ compileClasspath - Compile classpath for source set 'main'.
 
         file("build.gradle") << """
             repositories {
-               maven { url "${mavenRepo.uri}" }
+               maven { url = "${mavenRepo.uri}" }
             }
             configurations {
-                createWithRole('compileOnly', org.gradle.api.internal.artifacts.configurations.ConfigurationRolesForMigration.RESOLVABLE_BUCKET_TO_BUCKET)
-                implementation.extendsFrom compileOnly
+                migratingUnlocked('variant', org.gradle.api.internal.artifacts.configurations.ConfigurationRolesForMigration.LEGACY_TO_CONSUMABLE)
+                implementation.extendsFrom variant
             }
             dependencies {
-                compileOnly 'foo:foo:1.0'
+                variant 'foo:foo:1.0'
                 implementation 'foo:bar:2.0'
             }
         """
 
         when:
+        executer.expectDocumentedDeprecationWarning("The variant configuration has been deprecated for dependency declaration. This will fail with an error in Gradle 9.0. Please use another configuration instead. For more information, please refer to https://docs.gradle.org/current/userguide/declaring_dependencies.html#sec:deprecated-configurations in the Gradle documentation.")
         run ":dependencies"
 
         then:
         output.contains """
-compileOnly (n)
-\\--- foo:foo:1.0 (n)
-
 implementation
-+--- foo:foo:1.0
-\\--- foo:bar:2.0
++--- foo:bar:2.0
+\\--- foo:foo:1.0
+
+variant (n)
+\\--- foo:foo:1.0 (n)
 
 (n) - A dependency or dependency configuration that cannot be resolved.
 """
 
         when:
-        run ":dependencies", "--configuration", "compileOnly"
+        executer.expectDocumentedDeprecationWarning("The variant configuration has been deprecated for dependency declaration. This will fail with an error in Gradle 9.0. Please use another configuration instead. For more information, please refer to https://docs.gradle.org/current/userguide/declaring_dependencies.html#sec:deprecated-configurations in the Gradle documentation.")
+        run ":dependencies", "--configuration", "variant"
 
         then:
         output.contains """
-compileOnly (n)
+variant (n)
 \\--- foo:foo:1.0 (n)
 
 (n) - A dependency or dependency configuration that cannot be resolved.

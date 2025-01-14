@@ -16,7 +16,6 @@
 
 package org.gradle.internal.deprecation;
 
-import org.gradle.api.Incubating;
 import org.gradle.api.artifacts.Configuration;
 
 import java.util.List;
@@ -29,8 +28,8 @@ import java.util.List;
  * other gradle subprojects.  These methods include:
  * <ul>
  *     <li>{@link #preventUsageMutation()}</li>
- *     <li>{@link #setCanBeDeclaredAgainst(boolean)}</li>
- *     <li>{@link #isCanBeDeclaredAgainst()}</li>
+ *     <li>{@link #setCanBeDeclared(boolean)}</li>
+ *     <li>{@link #isCanBeDeclared()}</li>
  * </ul>
  * These methods would be better suited for the base {@link Configuration} interface, or the (inaccessible from this project)
  * {@link org.gradle.api.internal.artifacts.configurations.ConfigurationInternal ConfigurationInternal}
@@ -75,7 +74,7 @@ public interface DeprecatableConfiguration extends Configuration {
             DeprecationLogger.deprecateConfiguration(getName())
                 .forConsumption()
                 .willBecomeAnErrorInGradle9()
-                .withUserManual("dependencies_should_no_longer_be_declared_using_the_compile_and_runtime_configurations")
+                .withUserManual("declaring_dependencies", "sec:deprecated-configurations")
                 .nagUser();
         }
     }
@@ -89,7 +88,7 @@ public interface DeprecatableConfiguration extends Configuration {
                 .forDependencyDeclaration()
                 .replaceWith(getDeclarationAlternatives())
                 .willBecomeAnErrorInGradle9()
-                .withUpgradeGuideSection(5, "dependencies_should_no_longer_be_declared_using_the_compile_and_runtime_configurations")
+                .withUserManual("declaring_dependencies", "sec:deprecated-configurations")
                 .nagUser();
         }
     }
@@ -103,7 +102,7 @@ public interface DeprecatableConfiguration extends Configuration {
                 .forResolution()
                 .replaceWith(getResolutionAlternatives())
                 .willBecomeAnErrorInGradle9()
-                .withUpgradeGuideSection(5, "dependencies_should_no_longer_be_declared_using_the_compile_and_runtime_configurations")
+                .withUserManual("declaring_dependencies", "sec:deprecated-configurations")
                 .nagUser();
         }
     }
@@ -118,26 +117,8 @@ public interface DeprecatableConfiguration extends Configuration {
 
     /**
      * Prevents any calls to methods that change this configuration's allowed usage (e.g. {@link #setCanBeConsumed(boolean)},
-     * {@link #setCanBeResolved(boolean)}, {@link #setCanBeDeclaredAgainst(boolean)}) from succeeding; and causes them
+     * {@link #setCanBeResolved(boolean)}, {@link #setCanBeDeclared(boolean)}) from succeeding; and causes them
      * to throw an exception.
      */
     void preventUsageMutation();
-
-    /**
-     * Configures if a configuration can have dependencies declared upon it.
-     *
-     * @since 8.0
-     */
-    @Incubating
-    void setCanBeDeclaredAgainst(boolean allowed);
-
-    /**
-     * Returns true if it is allowed to declare dependencies upon this configuration.
-     * Defaults to true.
-     * @return true if this configuration can have dependencies declared
-     *
-     * @since 8.0
-     */
-    @Incubating
-    boolean isCanBeDeclaredAgainst();
 }

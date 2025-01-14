@@ -18,8 +18,11 @@ package org.gradle.internal.build;
 
 import org.gradle.api.artifacts.component.BuildIdentifier;
 import org.gradle.api.internal.GradleInternal;
+import org.gradle.api.internal.project.ProjectState;
 import org.gradle.initialization.IncludedBuildSpec;
 import org.gradle.internal.DisplayName;
+import org.gradle.internal.service.scopes.Scope;
+import org.gradle.internal.service.scopes.ServiceScope;
 import org.gradle.util.Path;
 
 import java.io.File;
@@ -30,6 +33,7 @@ import java.util.function.Function;
  *
  * Implementations are not yet entirely thread-safe, but should be.
  */
+@ServiceScope(Scope.Build.class)
 public interface BuildState {
     DisplayName getDisplayName();
 
@@ -54,11 +58,6 @@ public interface BuildState {
     boolean isImportableBuild();
 
     /**
-     * Note: may change value over the lifetime of this build, as this is often a function of the name of the root project in the build and this is not known until the settings have been configured. A temporary value will be returned when child builds need to create projects for some reason.
-     */
-    Path getCurrentPrefixForProjectsInChildBuilds();
-
-    /**
      * Calculates the identity path for a project in this build.
      */
     Path calculateIdentityPathForProject(Path projectPath) throws IllegalStateException;
@@ -73,6 +72,13 @@ public interface BuildState {
      * Have the projects been loaded, ie has {@link #ensureProjectsLoaded()} already completed for this build?
      */
     boolean isProjectsLoaded();
+
+    /**
+     * Has the mutable model for projects been created yet?
+     *
+     * @see ProjectState#isCreated()
+     */
+    boolean isProjectsCreated();
 
     /**
      * Ensures all projects in this build are configured, if not already done.

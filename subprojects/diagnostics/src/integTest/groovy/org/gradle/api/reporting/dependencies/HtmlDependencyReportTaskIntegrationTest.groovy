@@ -43,7 +43,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
             apply plugin : 'project-report'
             description = 'dummy description'
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { compile }
             configurations { testCompile }
@@ -109,7 +109,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
         file("build.gradle") << """
             apply plugin : 'project-report'
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { compile }
             dependencies {
@@ -144,7 +144,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
         file("build.gradle") << """
             apply plugin : 'project-report'
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { compile }
             dependencies {
@@ -175,7 +175,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
         file("build.gradle") << """
             apply plugin : 'project-report'
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { compile }
             dependencies {
@@ -198,6 +198,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
 
     def "generates report for multiple projects"() {
         given:
+        createDirs("a", "b")
         file("settings.gradle") << """
             rootProject.name = 'fooProject'
             include 'a', 'b'
@@ -246,6 +247,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
 
     def "generates index.html file"() {
         given:
+        createDirs("a", "b")
         file("settings.gradle") << """
             rootProject.name = 'fooProject'
             include 'a', 'b'
@@ -290,7 +292,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
         file("build.gradle") << """
             apply plugin : 'project-report'
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { compile }
             dependencies {
@@ -370,7 +372,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
         file("build.gradle") << """
             apply plugin : 'project-report'
             repositories {
-                maven { url "${mavenRepo.uri}" }
+                maven { url = "${mavenRepo.uri}" }
             }
             configurations { compile }
             dependencies {
@@ -396,6 +398,7 @@ class HtmlDependencyReportTaskIntegrationTest extends AbstractIntegrationSpec {
         mavenRepo.module("foo", "bar", "1.0").publish()
         mavenRepo.module("foo", "bar", "2.0").publish()
 
+        createDirs("a", "b", "a/c", "d", "e")
         file("settings.gradle") << """include 'a', 'b', 'a:c', 'd', 'e'
 rootProject.name = 'root'
 """
@@ -406,7 +409,7 @@ rootProject.name = 'root'
             allprojects {
                 version = '1.0'
                 repositories {
-                    maven { url "${mavenRepo.uri}" }
+                    maven { url = "${mavenRepo.uri}" }
                 }
                 configurations {
                     api
@@ -525,7 +528,7 @@ rootProject.name = 'root'
             apply plugin : 'project-report'
 
             repositories {
-               maven { url "${mavenRepo.uri}" }
+               maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 api.canBeConsumed = false
@@ -560,10 +563,10 @@ rootProject.name = 'root'
             apply plugin : 'project-report'
 
             repositories {
-               maven { url "${mavenRepo.uri}" }
+               maven { url = "${mavenRepo.uri}" }
             }
             configurations {
-                createWithRole('compileOnly', org.gradle.api.internal.artifacts.configurations.ConfigurationRolesForMigration.RESOLVABLE_BUCKET_TO_BUCKET)
+                migratingUnlocked('compileOnly', org.gradle.api.internal.artifacts.configurations.ConfigurationRolesForMigration.LEGACY_TO_CONSUMABLE)
             }
             dependencies {
                 compileOnly 'foo:foo:1.0'
@@ -571,6 +574,7 @@ rootProject.name = 'root'
         """
 
         when:
+        executer.expectDocumentedDeprecationWarning("The compileOnly configuration has been deprecated for dependency declaration. This will fail with an error in Gradle 9.0. Please use another configuration instead. For more information, please refer to https://docs.gradle.org/current/userguide/declaring_dependencies.html#sec:deprecated-configurations in the Gradle documentation.")
         run "htmlDependencyReport"
         def json = readGeneratedJson("root")
         def apiConfiguration = json.project.configurations.find { it.name == "compileOnly" }
@@ -592,11 +596,11 @@ rootProject.name = 'root'
             apply plugin : 'project-report'
 
             repositories {
-               maven { url "${mavenRepo.uri}" }
+               maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 undeclarable {
-                    canBeDeclaredAgainst = false
+                    canBeDeclared = false
                 }
             }
         """
@@ -617,14 +621,14 @@ rootProject.name = 'root'
             apply plugin : 'project-report'
 
             repositories {
-               maven { url "${mavenRepo.uri}" }
+               maven { url = "${mavenRepo.uri}" }
             }
             configurations {
                 declarable {
-                    canBeDeclaredAgainst = true
+                    canBeDeclared = true
                 }
                 undeclarable {
-                    canBeDeclaredAgainst = false
+                    canBeDeclared = false
                     extendsFrom(declarable)
                 }
             }

@@ -3,13 +3,14 @@ package configurations
 import common.JvmCategory
 import common.Os
 import common.applyDefaultSettings
+import common.buildScanTagParam
 import common.toCapitalized
 import configurations.TestSplitType.EXCLUDE
 import configurations.TestSplitType.INCLUDE
-import jetbrains.buildServer.configs.kotlin.v2019_2.BuildStep
-import jetbrains.buildServer.configs.kotlin.v2019_2.BuildSteps
-import jetbrains.buildServer.configs.kotlin.v2019_2.Project
-import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.script
+import jetbrains.buildServer.configs.kotlin.BuildStep
+import jetbrains.buildServer.configs.kotlin.BuildSteps
+import jetbrains.buildServer.configs.kotlin.Project
+import jetbrains.buildServer.configs.kotlin.buildSteps.script
 import model.CIBuildModel
 import model.Stage
 
@@ -88,16 +89,13 @@ class DocsTestProject(
     }
 }
 
-class DocsTestTrigger(model: CIBuildModel, docsTestProject: DocsTestProject) : BaseGradleBuildType(init = {
+class DocsTestTrigger(model: CIBuildModel, docsTestProject: DocsTestProject) : OsAwareBaseGradleBuildType(os = docsTestProject.os, init = {
     id("${asDocsTestId(model, docsTestProject.os)}_Trigger")
     name = docsTestProject.name + " (Trigger)"
     type = Type.COMPOSITE
 
     applyDefaultSettings()
 
-    features {
-        publishBuildStatusToGithub(model)
-    }
     dependencies {
         snapshotDependencies(docsTestProject.docsTests)
     }
@@ -117,14 +115,10 @@ class DocsTest(
     docsTestType: DocsTestType,
     testSplitType: TestSplitType,
     testClasses: List<String>,
-) : BaseGradleBuildType(stage = stage, init = {
+) : OsAwareBaseGradleBuildType(os = os, stage = stage, init = {
 
-    id("${model.projectId}_${docsTestType.docsTestName}_${testJava.version.name.toCapitalized()}_${os.asName()}_$index")
+    id("${model.projectId}_${docsTestType.docsTestName}_${os.asName()}_$index")
     name = "${docsTestType.docsTestDesc} - ${testJava.version.name.toCapitalized()} ${os.asName()} ($index)"
-
-    features {
-        publishBuildStatusToGithub(model)
-    }
 
     applyTestDefaults(
         model,
@@ -133,7 +127,7 @@ class DocsTest(
         os = os,
         arch = os.defaultArch,
         timeout = 60,
-        extraParameters = buildScanTag(docsTestType.docsTestName) +
+        extraParameters = buildScanTagParam(docsTestType.docsTestName) +
             " -PenableConfigurationCacheForDocsTests=${docsTestType.ccEnabled}" +
             " -PtestJavaVersion=${testJava.version.major}" +
             " -PtestJavaVendor=${testJava.vendor.name}" +

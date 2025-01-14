@@ -15,7 +15,6 @@
  */
 package org.gradle.api.tasks.diagnostics;
 
-import com.google.common.collect.Lists;
 import org.gradle.api.Action;
 import org.gradle.api.artifacts.ModuleVersionIdentifier;
 import org.gradle.api.artifacts.ResolveException;
@@ -24,6 +23,7 @@ import org.gradle.api.artifacts.result.DependencyResult;
 import org.gradle.api.artifacts.result.ResolvedComponentResult;
 import org.gradle.api.internal.artifacts.ivyservice.resolveengine.graph.conflicts.Conflict;
 import org.gradle.api.internal.artifacts.ivyservice.resolveengine.graph.conflicts.VersionConflictException;
+import org.gradle.api.provider.Provider;
 import org.gradle.api.specs.Spec;
 import org.gradle.internal.UncheckedException;
 import org.gradle.internal.component.external.model.DefaultModuleComponentSelector;
@@ -32,28 +32,34 @@ import org.gradle.internal.logging.text.StyledTextOutput;
 import org.gradle.internal.logging.text.StyledTextOutput.Style;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
 import static org.gradle.util.internal.TextUtil.getPluralEnding;
 
-class ResolutionErrorRenderer implements Action<Throwable> {
+class ResolutionErrorRenderer {
     private final Spec<DependencyResult> dependencySpec;
-    private final List<Action<StyledTextOutput>> errorActions = Lists.newArrayListWithExpectedSize(1);
+    private final List<Action<StyledTextOutput>> errorActions = new ArrayList<>(1);
+    private final List<Provider<List<? extends Throwable>>> errorSources = new ArrayList<>(1);
 
     public ResolutionErrorRenderer(@Nullable Spec<DependencyResult> dependencySpec) {
         this.dependencySpec = dependencySpec;
     }
 
-    @Override
-    public void execute(Throwable throwable) {
-        if (throwable instanceof ResolveException) {
-            Throwable cause = throwable.getCause();
-            handleResolutionError(cause);
-        } else {
-            throw UncheckedException.throwAsUncheckedException(throwable);
-        }
+    public void addErrorSource(Provider<List<? extends Throwable>> errorSource) {
+        errorSources.add(errorSource);
+    }
+
+    private void resolveErrorProviders() {
+        errorSources.stream().flatMap(x -> x.get().stream()).forEach(failure -> {
+            if (failure instanceof ResolveException) {
+                ((ResolveException) failure).getCauses().forEach(this::handleResolutionError);
+            } else {
+                handleResolutionError(failure);
+            }
+        });
     }
 
     private void handleResolutionError(Throwable cause) {
@@ -100,6 +106,7 @@ class ResolutionErrorRenderer implements Action<Throwable> {
     }
 
     public void renderErrors(StyledTextOutput output) {
+        resolveErrorProviders();
         for (Action<StyledTextOutput> errorAction : errorActions) {
             errorAction.execute(output);
         }

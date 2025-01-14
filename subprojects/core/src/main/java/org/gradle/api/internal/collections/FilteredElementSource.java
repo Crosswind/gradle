@@ -17,11 +17,11 @@ package org.gradle.api.internal.collections;
 
 import org.gradle.api.Action;
 import org.gradle.api.internal.MutationGuard;
-import org.gradle.api.internal.WithEstimatedSize;
 import org.gradle.api.internal.provider.CollectionProviderInternal;
 import org.gradle.api.internal.provider.ProviderInternal;
 import org.gradle.internal.Cast;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -37,11 +37,6 @@ public class FilteredElementSource<T, S extends T> implements ElementSource<S> {
 
     @Override
     public boolean add(S o) {
-        throw new UnsupportedOperationException(String.format("Cannot add '%s' to '%s' as it is a filtered collection", o, this));
-    }
-
-    @Override
-    public boolean addRealized(S o) {
         throw new UnsupportedOperationException(String.format("Cannot add '%s' to '%s' as it is a filtered collection", o, this));
     }
 
@@ -98,24 +93,23 @@ public class FilteredElementSource<T, S extends T> implements ElementSource<S> {
     }
 
     @Override
-    public MutationGuard getMutationGuard() {
-        return collection.getMutationGuard();
+    public MutationGuard getLazyBehaviorGuard() {
+        return collection.getLazyBehaviorGuard();
     }
 
-    private static class FilteringIterator<T, S extends T> implements Iterator<S>, WithEstimatedSize {
+    private static class FilteringIterator<T, S extends T> implements Iterator<S> {
         private final CollectionFilter<S> filter;
         private final Iterator<T> iterator;
-        private final int estimatedSize;
 
         private S next;
 
         FilteringIterator(ElementSource<T> collection, CollectionFilter<S> filter) {
             this.iterator = collection.iteratorNoFlush();
             this.filter = filter;
-            this.estimatedSize = collection.estimatedSize();
             this.next = findNext();
         }
 
+        @Nullable
         private S findNext() {
             while (iterator.hasNext()) {
                 T potentialNext = iterator.next();
@@ -147,11 +141,6 @@ public class FilteredElementSource<T, S extends T> implements ElementSource<S> {
         @Override
         public void remove() {
             throw new UnsupportedOperationException("This iterator does not support removal");
-        }
-
-        @Override
-        public int estimatedSize() {
-            return estimatedSize;
         }
     }
 
@@ -216,7 +205,12 @@ public class FilteredElementSource<T, S extends T> implements ElementSource<S> {
     }
 
     @Override
-    public void onRealize(Action<S> action) { }
+    public void onPendingAdded(Action<S> action) { }
+
+    @Override
+    public void setSubscriptionVerifier(EventSubscriptionVerifier<S> immediateRealizationSpec) {
+        // The root element source is responsible for realizing elements of subscribed types.
+    }
 
     @Override
     public void realizeExternal(ProviderInternal<? extends S> provider) {

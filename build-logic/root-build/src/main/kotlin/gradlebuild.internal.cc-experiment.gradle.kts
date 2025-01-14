@@ -46,7 +46,6 @@ val unsupportedTasksPredicate: (Task) -> Boolean = { task: Task ->
         task.name in listOf(
             "updateInitPluginTemplateVersionFile",
             "resolveAllDependencies",
-            "quickCheck",
         ) -> true
         task.name.endsWith("Wrapper") -> true
         task.name in listOf("docs", "stageDocs", "serveDocs") -> true
@@ -61,6 +60,9 @@ val unsupportedTasksPredicate: (Task) -> Boolean = { task: Task ->
             "NativeProjectWithDepsGeneratorTask",
             "CppMultiProjectGeneratorTask",
             "BuildBuilderGenerator",
+            "PerformanceTest",
+            "BuildCommitDistribution",
+            "DetermineBaselines",
         ) -> true
 
         // Third parties tasks
@@ -77,22 +79,17 @@ val unsupportedTasksPredicate: (Task) -> Boolean = { task: Task ->
 
         // Gradle Doctor plugin
         task.name in listOf(
-            "buildHealth",
-            "projectHealth",
             "graph", "graphMain",
             "projectGraphReport",
             "ripples",
             "aggregateAdvice",
         ) -> true
         task.name.startsWithAnyOf(
-            "abiAnalysis",
             "advice",
             "analyzeClassUsage",
             "analyzeJar",
-            "artifactsReport",
             "constantUsageDetector",
             "createVariantFiles",
-            "findDeclaredProcs",
             "findUnusedProcs",
             "generalsUsageDetector",
             "importFinder",
@@ -102,7 +99,6 @@ val unsupportedTasksPredicate: (Task) -> Boolean = { task: Task ->
             "reason",
             "redundantKaptCheck",
             "redundantPluginAlert",
-            "serviceLoader",
         ) -> true
 
         else -> false

@@ -15,12 +15,14 @@
  */
 package org.gradle.api.tasks.diagnostics
 
+
 import org.gradle.cache.internal.BuildScopeCacheDir
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.TestResources
 import org.gradle.util.GradleVersion
 import org.junit.Rule
 
+import static org.gradle.api.internal.DocumentationRegistry.BASE_URL
 import static org.gradle.integtests.fixtures.SuggestionsMessages.GET_HELP
 import static org.gradle.integtests.fixtures.SuggestionsMessages.INFO_DEBUG
 import static org.gradle.integtests.fixtures.SuggestionsMessages.SCAN
@@ -36,7 +38,7 @@ class HelpTaskIntegrationTest extends AbstractIntegrationSpec {
 
     def "shows help message when tasks #tasks run in a directory with no build definition present"() {
         useTestDirectoryThatIsNotEmbeddedInAnotherBuild()
-        executer.requireOwnGradleUserHomeDir()
+        executer.requireOwnGradleUserHomeDir().withArgument("--no-problems-report")
 
         when:
         run(*tasks)
@@ -51,13 +53,13 @@ Directory '$testDirectory' does not contain a Gradle build.
 
 To create a new build in this directory, run gradle init
 
-For more detail on the 'init' task, see https://docs.gradle.org/$version/userguide/build_init_plugin.html
+For more detail on the 'init' task, see $BASE_URL/userguide/build_init_plugin.html
 
-For more detail on creating a Gradle build, see https://docs.gradle.org/$version/userguide/tutorial_using_tasks.html
+For more detail on creating a Gradle build, see $BASE_URL/userguide/tutorial_using_tasks.html
 
 To see a list of command-line options, run gradle --help
 
-For more detail on using Gradle, see https://docs.gradle.org/$version/userguide/command_line_interface.html
+For more detail on using Gradle, see $BASE_URL/userguide/command_line_interface.html
 
 For troubleshooting, visit https://help.gradle.org
 
@@ -81,7 +83,7 @@ BUILD SUCCESSFUL"""
         def sub = file("sub").createDir()
 
         when:
-        executer.inDirectory(sub)
+        executer.inDirectory(sub).withArgument("--no-problems-report")
         run "help"
 
         then:
@@ -190,9 +192,11 @@ To run a build, run gradle <task> ...
 
     def "shows basic welcome message for current project only"() {
         given:
+        createDirs("a", "b", "c")
         settingsFile << "include 'a', 'b', 'c'"
 
         when:
+        executer.withArgument("--no-problems-report")
         run "help"
 
         then:
@@ -210,7 +214,7 @@ To see more detail about a task, run gradle help --task <task>
 
 To see a list of command-line options, run gradle --help
 
-For more detail on using Gradle, see https://docs.gradle.org/$version/userguide/command_line_interface.html
+For more detail on using Gradle, see $BASE_URL/userguide/command_line_interface.html
 
 For troubleshooting, visit https://help.gradle.org
 
@@ -219,6 +223,7 @@ BUILD SUCCESSFUL"""
 
     def "can print help for implicit tasks"() {
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "dependencies"
         then:
         output.contains """Detailed task information for dependencies
@@ -245,6 +250,7 @@ BUILD SUCCESSFUL"""
 
     def "can print help for placeholder added tasks"() {
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "help"
         then:
         output.contains """Detailed task information for help
@@ -271,6 +277,7 @@ BUILD SUCCESSFUL"""
 
     def "help for tasks same type different descriptions"() {
         setup:
+        createDirs("someproj")
         settingsFile.text = """
 include ":someproj"
 """
@@ -285,6 +292,7 @@ include ":someproj"
         }
 """
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "hello"
         then:
         output.contains """Detailed task information for hello
@@ -311,6 +319,7 @@ BUILD SUCCESSFUL"""
 
     def "help for tasks same type different groups"() {
         setup:
+        createDirs("someproj1", "someproj2")
         settingsFile.text = """
 include ":someproj1"
 include ":someproj2"
@@ -331,6 +340,7 @@ include ":someproj2"
         }
 """
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "hello"
         then:
         output.contains """Detailed task information for hello
@@ -359,9 +369,11 @@ BUILD SUCCESSFUL"""
 
     def "matchingTasksOfSameType"() {
         setup:
+        createDirs("subproj1")
         settingsFile << "include ':subproj1'"
         buildFile << "allprojects{ apply plugin:'java'}"
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", ":jar"
         then:
         output.contains """Detailed task information for :jar
@@ -384,6 +396,7 @@ Group
 BUILD SUCCESSFUL"""
 
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "jar"
         then:
         output.contains """Detailed task information for jar
@@ -410,6 +423,7 @@ BUILD SUCCESSFUL"""
 
     def "multipleMatchingTasksOfDifferentType"() {
         setup:
+        createDirs("subproj1")
         settingsFile << "include ':subproj1'"
         buildFile << """task someTask(type:Jar){
             description = "an archiving operation"
@@ -422,6 +436,7 @@ BUILD SUCCESSFUL"""
         }"""
 
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "someTask"
         then:
         output.contains """Detailed task information for someTask
@@ -497,6 +512,7 @@ BUILD SUCCESSFUL"""
             description = "a description"
         }"""
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "sCC"
         then:
         output.contains """Detailed task information for sCC
@@ -537,7 +553,9 @@ BUILD SUCCESSFUL"""
     }
 
     def "listsEnumAndBooleanCmdOptionValues"() {
+        createDirs("proj1", "proj2")
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "hello"
         then:
         output.contains """Detailed task information for hello
@@ -553,13 +571,13 @@ Type
 Options
      --booleanValue     Configures a boolean flag in CustomTask.
 
+     --no-booleanValue     Disables option --booleanValue.
+
      --enumValue     Configures an enum value in CustomTask.
                      Available values are:
                           ABC
                           DEF
                           GHIJKL
-
-     --no-booleanValue     Disables option --booleanValue
 
 ${builtInOptions}
 
@@ -573,7 +591,9 @@ BUILD SUCCESSFUL"""
     }
 
     def "listsCommonDynamicAvailableValues"() {
+        createDirs("sub1", "sub2")
         when:
+        executer.withArgument("--no-problems-report")
         run "help", "--task", "hello"
         then:
         output.contains """Detailed task information for hello
@@ -610,16 +630,16 @@ BUILD SUCCESSFUL"""
         then:
         output.contains """
 Options
-     --no-valueA     Disables option --valueA
-
-     --no-valueB     Disables option --valueB
-
-     --no-valueC     Disables option --valueC
-
      --valueA     descA
+
+     --no-valueA     Disables option --valueA.
 
      --valueB     descB
 
-     --valueC     descC"""
+     --no-valueB     Disables option --valueB.
+
+     --valueC     descC
+
+     --no-valueC     Disables option --valueC."""
     }
 }

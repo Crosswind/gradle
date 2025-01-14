@@ -18,7 +18,6 @@ package org.gradle.api.reporting.dependents;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.internal.project.ProjectInternal;
@@ -27,6 +26,7 @@ import org.gradle.api.tasks.Console;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.api.tasks.diagnostics.internal.ProjectDetails;
 import org.gradle.api.tasks.options.Option;
+import org.gradle.internal.deprecation.DeprecationLogger;
 import org.gradle.internal.logging.text.StyledTextOutput;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
 import org.gradle.internal.work.WorkerLeaseService;
@@ -36,6 +36,7 @@ import org.gradle.platform.base.internal.dependents.DependentBinariesResolver;
 import org.gradle.work.DisableCachingByDefault;
 
 import javax.inject.Inject;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -138,6 +139,10 @@ public abstract class DependentComponentsReport extends DefaultTask {
 
     @TaskAction
     public void report() {
+        DeprecationLogger.whileDisabled(this::doReport);
+    }
+
+    private void doReport() {
         // Once we are here, the project lock is held. If we synchronize to avoid cross-project operations, we will have a dead lock.
         getWorkerLeaseService().runAsIsolatedTask(() -> {
             // Output reports per execution, not mixed.
@@ -174,7 +179,7 @@ public abstract class DependentComponentsReport extends DefaultTask {
         if (components == null || components.isEmpty()) {
             return allComponents;
         }
-        Set<ComponentSpec> reportedComponents = Sets.newLinkedHashSet();
+        Set<ComponentSpec> reportedComponents = new LinkedHashSet<>();
         List<String> notFound = Lists.newArrayList(components);
         for (ComponentSpec candidate : allComponents) {
             String candidateName = candidate.getName();

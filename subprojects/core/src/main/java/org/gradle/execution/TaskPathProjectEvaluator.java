@@ -19,13 +19,22 @@ package org.gradle.execution;
 import org.gradle.api.BuildCancelledException;
 import org.gradle.api.Project;
 import org.gradle.api.internal.project.ProjectInternal;
+import org.gradle.api.internal.project.ProjectState;
 import org.gradle.initialization.BuildCancellationToken;
+import org.gradle.internal.UncheckedException;
+import org.gradle.internal.operations.BuildOperationContext;
+import org.gradle.internal.operations.BuildOperationDescriptor;
+import org.gradle.internal.operations.BuildOperationExecutor;
+import org.gradle.internal.operations.MultipleBuildOperationFailures;
+import org.gradle.internal.operations.RunnableBuildOperation;
 
 public class TaskPathProjectEvaluator implements ProjectConfigurer {
     private final BuildCancellationToken cancellationToken;
+    private final BuildOperationExecutor buildOperationExecutor;
 
-    public TaskPathProjectEvaluator(BuildCancellationToken cancellationToken) {
+    public TaskPathProjectEvaluator(BuildCancellationToken cancellationToken, BuildOperationExecutor buildOperationExecutor) {
         this.cancellationToken = cancellationToken;
+        this.buildOperationExecutor = buildOperationExecutor;
     }
 
     @Override
@@ -34,12 +43,12 @@ public class TaskPathProjectEvaluator implements ProjectConfigurer {
     }
 
     @Override
-    public void configureFully(ProjectInternal project) {
-        configure(project);
+    public void configureFully(ProjectState projectState) {
+        projectState.ensureConfigured();
         if (cancellationToken.isCancellationRequested()) {
             throw new BuildCancelledException();
         }
-        project.getOwner().ensureTasksDiscovered();
+        projectState.ensureTasksDiscovered();
     }
 
     @Override
@@ -47,6 +56,32 @@ public class TaskPathProjectEvaluator implements ProjectConfigurer {
         configure(project);
         for (Project sub : project.getSubprojects()) {
             configure((ProjectInternal) sub);
+        }
+    }
+
+    @Override
+    public void configureHierarchyInParallel(ProjectInternal project) {
+        try {
+            buildOperationExecutor.runAllWithAccessToProjectState(queue -> {
+                for (Project p : project.getAllprojects()) {
+                    queue.add(new RunnableBuildOperation() {
+                        @Override
+                        public void run(BuildOperationContext context) {
+                            configure((ProjectInternal) p);
+                        }
+
+                        @Override
+                        public BuildOperationDescriptor.Builder description() {
+                            return BuildOperationDescriptor.displayName("Configure project " + p.getName());
+                        }
+                    });
+                }
+            });
+        } catch (MultipleBuildOperationFailures e) {
+            if (e.getCauses().size() == 1) {
+                throw UncheckedException.throwAsUncheckedException(e.getCauses().get(0));
+            }
+            throw e;
         }
     }
 }

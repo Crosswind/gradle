@@ -25,22 +25,26 @@ import org.gradle.api.Incubating;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.result.DependencyResult;
-import org.gradle.api.artifacts.result.ResolutionResult;
 import org.gradle.api.artifacts.result.ResolvedComponentResult;
 import org.gradle.api.artifacts.result.ResolvedDependencyResult;
 import org.gradle.api.artifacts.result.ResolvedVariantResult;
 import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.AttributeContainer;
 import org.gradle.api.attributes.HasAttributes;
+import org.gradle.api.internal.artifacts.ResolverResults;
 import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
+import org.gradle.api.internal.artifacts.configurations.ResolutionResultProvider;
 import org.gradle.api.internal.artifacts.configurations.ResolvableDependenciesInternal;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.VersionComparator;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.VersionParser;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.VersionSelectorScheme;
+import org.gradle.api.internal.artifacts.ivyservice.resolveengine.graph.results.VisitedGraphResults;
+import org.gradle.api.internal.artifacts.resolver.ResolutionOutputsInternal;
 import org.gradle.api.internal.attributes.AttributeContainerInternal;
-import org.gradle.api.internal.attributes.ImmutableAttributesFactory;
+import org.gradle.api.internal.attributes.AttributesFactory;
 import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
+import org.gradle.api.provider.ProviderFactory;
 import org.gradle.api.specs.Spec;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Internal;
@@ -58,7 +62,9 @@ import org.gradle.api.tasks.diagnostics.internal.insight.DependencyInsightReport
 import org.gradle.api.tasks.diagnostics.internal.text.StyledTable;
 import org.gradle.api.tasks.options.Option;
 import org.gradle.initialization.StartParameterBuildOptions;
+import org.gradle.internal.deprecation.DeprecationLogger;
 import org.gradle.internal.graph.GraphRenderer;
+import org.gradle.internal.instrumentation.api.annotations.ToBeReplacedByLazyProperty;
 import org.gradle.internal.logging.text.StyledTextOutput;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
 import org.gradle.internal.typeconversion.NotationParser;
@@ -67,6 +73,7 @@ import org.gradle.work.DisableCachingByDefault;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -143,7 +150,7 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
     public Property<ResolvedComponentResult> getRootComponentProperty() {
         // Required to maintain DslObject mapping
         Configuration configuration = getConfiguration();
-        if (!rootComponentProperty.isPresent() && configuration != null && getDependencySpec() != null) {
+        if (!rootComponentProperty.isPresent() && configuration != null && dependencySpec != null) {
             if (getShowingAllVariants().get()) {
                 ConfigurationInternal configurationInternal = (ConfigurationInternal) configuration;
                 if (!configurationInternal.isCanBeMutated()) {
@@ -152,24 +159,41 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
                         "In order to use the '--all-variants' option, the configuration must not be resolved before this task is executed."
                     );
                 }
-                configurationInternal.getResolutionStrategy().setReturnAllVariants(true);
+                configurationInternal.getResolutionStrategy().setIncludeAllSelectableVariantResults(true);
             }
             configurationName = configuration.getName();
             configurationDescription = configuration.toString();
             zConfigurationAttributes = getProject().provider(configuration::getAttributes);
 
-            ResolvableDependenciesInternal incoming = (ResolvableDependenciesInternal) configuration.getIncoming();
-            ResolutionResult result = incoming.getResolutionResult(errorHandler);
-            rootComponentProperty.set(result.getRootComponent());
+            ProviderFactory providerFactory = getProject().getProviders();
+            ResolutionOutputsInternal resolutionOutputs = ((ResolvableDependenciesInternal) configuration.getIncoming()).getResolutionOutputs();
+            ResolutionResultProvider<VisitedGraphResults> graphResultsProvider = resolutionOutputs.getRawResults().map(ResolverResults::getVisitedGraph);
+            errorHandler.addErrorSource(providerFactory.provider(() ->
+                graphResultsProvider.getValue().getResolutionFailure()
+                    .map(Collections::singletonList)
+                    .orElse(Collections.emptyList()))
+            );
+            rootComponentProperty.set(providerFactory.provider(() -> {
+                // We do not use the public resolution result API to avoid throwing exceptions that we visit above
+                return graphResultsProvider.getValue().getResolutionResult().getRootSource().get();
+            }));
         }
         return rootComponentProperty;
     }
 
     /**
      * Selects the dependency (or dependencies if multiple matches found) to show the report for.
+     * @deprecated Not intended for public use.
      */
     @Internal
+    @Deprecated
     public @Nullable Spec<DependencyResult> getDependencySpec() {
+        DeprecationLogger
+            .deprecateMethod(DependencyInsightReportTask.class, "getDependencySpec()")
+            .withContext("This method is not intended for public use.")
+            .willBeRemovedInGradle9()
+            .withUpgradeGuideSection(8, "dependency-insight-report-task-get-dependency-spec")
+            .nagUser();
         return dependencySpec;
     }
 
@@ -203,6 +227,7 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
      * Configuration to look the dependency in
      */
     @Internal
+    @ToBeReplacedByLazyProperty
     public @Nullable Configuration getConfiguration() {
         return configuration;
     }
@@ -235,6 +260,7 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
      * @since 4.9
      */
     @Internal
+    @ToBeReplacedByLazyProperty
     public boolean isShowSinglePathToDependency() {
         return showSinglePathToDependency;
     }
@@ -297,13 +323,28 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
     }
 
     /**
-     * An injected {@link ImmutableAttributesFactory}.
+     * An injected {@link AttributesFactory}.
      *
      * @since 4.9
      */
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
     @Inject
-    protected ImmutableAttributesFactory getAttributesFactory() {
+    protected AttributesFactory getImmutableAttributesFactory() {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * An injected {@link AttributesFactory}.
+     * <p>
+     * Previously named {@code getImmutableAttributesFactory}, this method has been renamed for better internal alignment.
+     *
+     * @since 8.12
+     */
+    @Internal
+    @Incubating
+    protected AttributesFactory getAttributesFactory() {
+        return getImmutableAttributesFactory();
     }
 
     @TaskAction
@@ -348,7 +389,7 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
                 + "\nIt can be specified from the command line, e.g: '" + getPath() + " --configuration someConf --dependency someDep'");
         }
 
-        if (getDependencySpec() == null) {
+        if (dependencySpec == null) {
             throw new InvalidUserDataException("Dependency insight report cannot be generated because the dependency to show was not specified."
                 + "\nIt can be specified from the command line, e.g: '" + getPath() + " --dependency someDep'");
         }
@@ -357,7 +398,7 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
     private Set<DependencyResult> selectDependencies(ResolvedComponentResult rootComponent) {
         final Set<DependencyResult> selectedDependencies = new LinkedHashSet<>();
         eachDependency(rootComponent, dependencyResult -> {
-            if (Objects.requireNonNull(getDependencySpec()).isSatisfiedBy(dependencyResult)) {
+            if (Objects.requireNonNull(dependencySpec).isSatisfiedBy(dependencyResult)) {
                 selectedDependencies.add(dependencyResult);
             }
         }, new HashSet<>());
@@ -408,9 +449,9 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
     private static final class RootDependencyRenderer implements NodeRenderer {
         private final DependencyInsightReportTask task;
         private final AttributeContainer configurationAttributes;
-        private final ImmutableAttributesFactory attributesFactory;
+        private final AttributesFactory attributesFactory;
 
-        public RootDependencyRenderer(DependencyInsightReportTask task, AttributeContainer configurationAttributes, ImmutableAttributesFactory attributesFactory) {
+        public RootDependencyRenderer(DependencyInsightReportTask task, AttributeContainer configurationAttributes, AttributesFactory attributesFactory) {
             this.task = task;
             this.configurationAttributes = configurationAttributes;
             this.attributesFactory = attributesFactory;
